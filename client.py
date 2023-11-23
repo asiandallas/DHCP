@@ -47,47 +47,6 @@ def menu():
 
 clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
-# Sending DISCOVER message    
-message = "DISCOVER " + MAC
-clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
-
-# LISTENING FOR RESPONSE 
-message, clientAddress = socket.recvfrom(4096) 
-
-# splitting the response into 3 parts
-parsed_message = parse_message(message) 
-response_MAC = get_MAC(message)
-response_IP = get_IP(message)
-response_time = get_time(message)
-timestamp = datetime.fromisoformat(response_time)
-
-if parsed_message == "OFFER":
-     if response_MAC == MAC:
-         pass
-     else:
-         message = "REQUEST " + MAC + " " + response_IP + " " + response_time
-         clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
-elif parsed_message == "DECLINE":
-    print("Request Denied!")
-    sys.exit()
-elif parsed_message == "ACKNOWLEDGE":
-     if response_MAC != MAC:
-         print("Request Denied!")
-         sys.exit()
-     else:
-         print("Your IP address is: " + response_IP + " which will expire at " + response_time)
-         client_choice = menu()
-         if client_choice == 1: # release
-            message = "RELEASE " + MAC + " " + response_IP + " " + response_time
-            clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
-         elif client_choice == 2: # renew
-             message = "RENEW " + MAC + " " + response_IP + " " + response_time
-             clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
-         else: # quit
-             clientSocket.close()
-             sys.exit()
-
-            # combining logic from above 
 try:
     while True:
         # Sending DISCOVER message
@@ -117,7 +76,7 @@ try:
             sys.exit()
         elif parsed_message == "ACKNOWLEDGE":
             if response_MAC != MAC:
-                print("Request Denied!")
+                print("Acknowledge Denied!")
                 sys.exit()
             else:
                 print("Your IP address is: " + response_IP + " which will expire at " + response_time)
@@ -136,6 +95,7 @@ except OSError:
     clientSocket.close()
     sys.exit()
 except KeyboardInterrupt:
+    print("Closing connection and terminating...")
     clientSocket.close()
     sys.exit()
   
