@@ -14,10 +14,10 @@ records = [] or {} or object
 # List containing all available IP addresses as strings
 ip_addresses = [ip.exploded for ip in IPv4Interface("192.168.45.0/28").network.hosts()]
 
-# Parse the client messages
+# Parse the client messages - gets response  
 def parse_message(message):
-    pass
-
+    response = message.split(' ', 1)[0]
+    return response
 
 # Calculate response based on message
 def dhcp_operation(parsed_message):
@@ -32,7 +32,6 @@ def dhcp_operation(parsed_message):
         pass
     elif request == "RENEW":
         pass
-
 
 # Start a UDP server
 server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
