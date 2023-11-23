@@ -86,7 +86,6 @@ elif parsed_message == "ACKNOWLEDGE":
          else: # quit
              clientSocket.close()
              sys.exit()
-    
 
             # combining logic from above 
 try:
@@ -132,10 +131,12 @@ try:
                 else: # quit
                     clientSocket.close()
                     sys.exit()
-
 except OSError:
-    pass
+    print("OS Error")
+    clientSocket.close()
+    sys.exit()
 except KeyboardInterrupt:
-    pass
+    clientSocket.close()
+    sys.exit()
   
 clientSocket.close()
