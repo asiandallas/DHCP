@@ -48,7 +48,7 @@ def mac_exists(mac_address):
 
 def check_ip(mac):
     for mac, record in records.items():
-        if record[mac].IPAddress in ip_addresses: # ip exists
+        if mac in record and 'IPAddress' in record[mac] and record[mac]['IPAddress'] in ip_addresses:
             return True
     return False
 
@@ -60,37 +60,42 @@ def check_time(mac):
     for mac_address, record in records.items():
         timestamp = record.get('Timestamp')
         if current_time > timestamp: # expired
-            return mac_address
+            return record
     return -1
 
 def get_nextIP():
-    index = len(records)
-    return ip_addresses[index]
+    for ip in ip_addresses:
+        if ip not in [record['IPAddress'] for record in records.values()]:
+            return ip
  
 # Calculate response based on message
 def dhcp_operation(parsed_message):
     request = parsed_message[0]
     if request == "LIST":
-        pass
+        return json.dumps(client_records)
     elif request == "DISCOVER":
         mac = parsed_message[1]  # Extract the MAC address from the request
         if mac_exists(mac): # record found
-            if records[mac].Timestamp > current_time: # not expired yet
-                records[mac].Ackend = True   
+            current_time = datetime.now()
+            message_time_with_space = records[mac]['Timestamp'][:10] + ' ' + records[mac]['Timestamp'][10:]
+            record_time = datetime.fromisoformat(message_time_with_space)
+
+            if record_time > current_time: # not expired yet
+                records[mac]['Acked'] = True   
                 return f"ACKNOWLEDGE {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
             else: # expired
                 current_time = datetime.now().isoformat()
                 timestamp = datetime.fromisoformat(current_time)
                 new_time = timestamp + timedelta(seconds=60)
-                records[mac].Timestamp = new_time
-                records[mac].Ackend = False  
+                records[mac]['Timestamp'] = new_time
+                records[mac]['Acked'] = False  
                 return f"OFFER {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
             
         else: # no record found
             ip_used = check_ip(parsed_message[1]) # returns true if found, false if not
-            time_expired = check_time(parsed_message[1]) # returns key of expired ip in records, -1 if none
+            time_expired = check_time(parsed_message[1]) # returns index of expired time, -1 if none
             if (ip_used == True) and (time_expired != -1): # ip found and something is expired
-                records[time_expired].IPAddress = get_nextIP()
+                records[time_expired]['IPAddress'] = ip_addresses[time_expired]
 
                 current_time = datetime.now().isoformat()
                 timestamp = datetime.fromisoformat(current_time)
@@ -113,7 +118,6 @@ def dhcp_operation(parsed_message):
                     "Acked": False
                 }
                 records[mac] = new_record
-                print("new records")
                 print(records[mac]['Timestamp'])
                 return f"OFFER {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
             
@@ -134,10 +138,10 @@ def dhcp_operation(parsed_message):
                 return f"ACKNOWLEDGE {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
     elif request == "RELEASE":
         mac = parsed_message[1]  # Extract the MAC address from the request
-        if mac_address in client_records:
-            removed_record = client_records.pop(mac_address)  # Remove the client record
+        if mac in records:
+            removed_record = records.pop(mac)  # Remove the client record
             current_time = datetime.now().isoformat()
-            records[mac][Timestamp] = current_time # setting time to an expired time
+            records[mac]['Timestamp'] = current_time # setting time to an expired time
             records[mac]['Acked'] = False 
         else:
             print("Server: Approved release request")
@@ -146,10 +150,10 @@ def dhcp_operation(parsed_message):
         ip = parsed_message[2]  # Extract the requested IP from the request
         timestamp = parsed_message[3]  # Extract the timestamp from the request
 
-        if mac in records and records[mac]['IP'] == requested_ip:
+        if mac in records and records[mac]['IPAddress'] == ip:
             # If the client exists and the IP matches, update the timestamp and renew the lease
-            client_records[mac_address]['Timestamp'] = timestamp
-            return "RENEWED"
+            records[mac]['Timestamp'] = timestamp
+            return f"OFFER {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
         else:
             return "DECLINE"  # Decline the renewal request if conditions are not met
 
