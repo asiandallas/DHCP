@@ -49,13 +49,13 @@ def menu():
     choice = int(input())
     return choice
 
-# Sending DISCOVER 
-print("Client: Discovering...")    
-message = "DISCOVER " + MAC
-clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
 
 try:
     while True:
+        # Sending DISCOVER 
+        print("Client: Discovering...")    
+        message = "DISCOVER " + MAC
+        clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
         # LISTENING FOR RESPONSE
         message, clientAddress = clientSocket.recvfrom(4096)
         parsed_message = parse_message(message.decode())
@@ -80,7 +80,7 @@ try:
             sys.exit()
             clientSocket.close()
         else: # matches
-            print("Your IP address is: " + parsed_message[2] + " which will expire at " + parsed_message[2])
+            print("Your IP address is: " + parsed_message[2] + " which will expire at " + parsed_message[3])
             client_choice = menu()
             if client_choice == 1: # release
                     message = "RELEASE " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[2]
@@ -90,7 +90,6 @@ try:
                 clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
             else: # quit
                 sys.exit()
-                clientSocket.close()
 except OSError:
     pass
 except KeyboardInterrupt:
