@@ -14,37 +14,31 @@ MAC = ":".join(["{:02x}".format((uuid.getnode() >> ele) & 0xFF) for ele in range
 SERVER_IP = "10.0.0.100"
 SERVER_PORT = 9000
 
+
+clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+
+# Parsing the message
 # [0]OFFER [1]A1:30:9B:D3:CE:18 [2]192.168.45.1 [3]2022-02-02T11:42:08.761340
-
-# Parse the server messages   
 def parse_message(message):
-    message_parts = message.decode().split()
-    response = message_parts[0]
-    mac = message_parts[1]
-    ip = message_parts[2]
-    time = message_parts[3]
-
+    message_parts = message.split()
     return message_parts
 
-# Parse the client messages - gets response  
-def parse_message(message):
-    response = message.split(' ')[0]
-    return response
+# checks whether the MAC address in the message matches the client's MAC address (line 10)
+def check_MAC(message_mac):
+    if message_mac == MAC:
+        return True
+    else:
+        return False
 
-# Parse the client messages - gets MAC  
-def get_MAC(message):
-    response = message.split(' ')[1]
-    return response
-
-# Parse the client messages - gets IP  
-def get_IP(message):
-    response = message.split(' ')[2]
-    return response
-
-# Parse the client messages - gets timestamp  
-def get_time(message):
-    response = message.split(' ')[3]
-    return response
+# checks whether the timestamp is not expired
+def check_timestamp(message_time):
+    current_time = datetime.now()
+    message_time_with_space = message_time[:10] + ' ' + message_time[10:]
+    record_time = datetime.fromisoformat(message_time_with_space)
+    if current_time < record_time:
+        return True
+    else:
+        return False
 
 def menu():
     print("Choose from the following choices: ")
@@ -55,58 +49,51 @@ def menu():
     choice = int(input())
     return choice
 
-clientSocket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+# Sending DISCOVER 
+print("Client: Discovering...")    
+message = "DISCOVER " + MAC
+clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
 
 try:
     while True:
-        # Sending DISCOVER message
-        print("Client: Discovering...")    
-        message = "DISCOVER " + MAC
-        clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
-        
-        # LISTENING FOR RESPONSE 
-        message, clientAddress = socket.recvfrom(4096) 
+        # LISTENING FOR RESPONSE
+        message, clientAddress = clientSocket.recvfrom(4096)
+        parsed_message = parse_message(message.decode())
+        print("Client: Message received from server with request ") 
+        print(parsed_message[0])
 
-        # splitting the response - parsed_message is a list
-        parsed_message = parse_message(message) 
-        response_MAC = parsed_message[0]
-        response_IP = parsed_message[1]
-        response_time = parsed_message[2]
-        timestamp = datetime.fromisoformat(response_time)
-        
-        if parsed_message == "OFFER":
-            if response_MAC == MAC:
-                pass
-            else:
-                print("Client: Requesting " + response_IP + " IP address")
-                message = "REQUEST " + MAC + " " + response_IP + " " + response_time
+        if parsed_message[0] == "OFFER":
+            if check_MAC(parsed_message[1]) and check_timestamp(parsed_message[3]): # mac from message matches client mac and time not expired
+                message = "REQUEST " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[3]
                 clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
-        elif parsed_message == "DECLINE":
+            else:
+                print("Error: MAC address does not match or time is expired")
+                sys.exit()
+                clientSocket.close()
+        elif parsed_message[0] == "DECLINE": # request was declined, and the client program terminates
             print("Request Denied!")
             sys.exit()
-        elif parsed_message == "ACKNOWLEDGE":
-            if response_MAC != MAC:
-                print("Acknowledge Denied!")
+        elif parsed_message[0] == "ACKNOWLEDGE":
+            print("in here")
+        if check_MAC(not parsed_message[1]): # mac from message DOES NOT matches client mac
+            print("Acknowledge Denied!")
+            sys.exit()
+            clientSocket.close()
+        else: # matches
+            print("Your IP address is: " + parsed_message[2] + " which will expire at " + parsed_message[2])
+            client_choice = menu()
+            if client_choice == 1: # release
+                    message = "RELEASE " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[2]
+                    clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
+            elif client_choice == 2: # renew
+                message = "RENEW " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[2]
+                clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
+            else: # quit
                 sys.exit()
-            else:
-                print("Your IP address is: " + response_IP + " which will expire at " + response_time)
-                client_choice = menu()
-                if client_choice == 1: # release
-                    message = "RELEASE " + MAC + " " + response_IP + " " + response_time
-                    clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
-                elif client_choice == 2: # renew
-                    message = "RENEW " + MAC + " " + response_IP + " " + response_time
-                    clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
-                else: # quit
-                    clientSocket.close()
-                    sys.exit()
+                clientSocket.close()
 except OSError:
-    print("OS Error")
-    clientSocket.close()
-    sys.exit()
+    pass
 except KeyboardInterrupt:
-    print("Closing connection and terminating...")
-    clientSocket.close()
-    sys.exit()
-  
-clientSocket.close()
+    pass
+
+server.close()                
