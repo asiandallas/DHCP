@@ -13,17 +13,11 @@ SERVER_PORT = 9000
 admin = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 # Avoid TIME_WAIT socket lock [DO NOT REMOVE]
 admin.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-admin.bind(("10.0.0.100", 9000))
 
-try:
-    while True:
-        message = "LIST"
-        admin.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
-        message, clientAddress = admin.recvfrom(4096)
-except OSError:
-    pass
-except KeyboardInterrupt:
-    pass
+message = "LIST"
+admin.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
+message, clientAddress = admin.recvfrom(4096)
+print(message.decode())
 
 admin.close()
 
