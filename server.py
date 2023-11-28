@@ -3,7 +3,6 @@ import socket
 from ipaddress import IPv4Interface
 from datetime import datetime, timedelta
 import sys
-import json  # Module for JSON serialization/deserialization
 
 # Time operations in python
 # isotimestring = datetime.now().isoformat()
@@ -49,20 +48,24 @@ def mac_exists(mac_address):
 
 def check_ip(mac):
     for mac, record in records.items():
-        if mac in record and record[mac]['IPAddress'] in ip_addresses:
+        if mac in record and 'IPAddress' in record[mac] and record[mac]['IPAddress'] in ip_addresses:
             return True
     return False
 
-# Checks if timestamp is expired
-def check_time(mac):
-    current_time = datetime.now().isoformat()
 
+
+def check_time(mac):
+    current_time = datetime.now() # date time object format date _ time
     # Loop through the records and check if each timestamp is less than the current time
     for mac_address, record in records.items():
-        timestamp = record.get('Timestamp')
+        timestamp = record.get('Timestamp') # datetime
+        print(timestamp) 
+        #time_stamp = datetime.strptime(timestamp,("%Y-%m-%d%H:%M:%S.%f")) # converts object to string
+        #message_time_with_space = timestamp[:10] + ' ' + timestamp[10:]
         if current_time > timestamp: # expired
             return record
     return -1
+
 
 def get_nextIP():
     for ip in ip_addresses:
@@ -78,11 +81,10 @@ def dhcp_operation(parsed_message):
         mac = parsed_message[1]  # Extract the MAC address from the request
         if mac_exists(mac): # record found
             current_time = datetime.now()
-            record_time = records[mac]['Timestamp']
-            message_time_with_t = record_time.strftime('%Y-%m-%dT%H:%M:%S.%f')[:-3]
-            record_time2 = datetime.fromisoformat(message_time_with_t)
+            timestamp = parsed_message[3]+" "+parsed_message[4] # datetime
+            record_time = datetime.fromisoformat(parsed_message[3]+" "+parsed_message[4])
 
-            if  message_time_with_t > current_time: # not expired yet
+            if record_time > current_time: # not expired yet
                 records[mac]['Acked'] = True   
                 return f"ACKNOWLEDGE {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
             else: # expired
@@ -109,18 +111,19 @@ def dhcp_operation(parsed_message):
             else:
                 current_time = datetime.now().isoformat()
                 timestamp = datetime.fromisoformat(current_time)
-                new_time = timestamp + timedelta(seconds=60)
+                new_time = timestamp + timedelta(seconds=60) 
                 # Format the timestamp without space between date and time
-                formatted_timestamp = new_time.strftime("%Y-%m-%d%H:%M:%S.%f")
+                #formatted_timestamp = new_time.strftime("%Y-%m-%d %H:%M:%S.%f") # string to object
                 new_record = {
                     "RecordNumber": record_num + 1,
                     "MACAddress": mac,
                     "IPAddress": get_nextIP(),
-                    "Timestamp": formatted_timestamp,
+                    "Timestamp": new_time, # datetime.datetime(y, m, d, h, s, f)
                     "Acked": False
                 }
                 records[mac] = new_record
-                print(records[mac]['Timestamp'])
+                print("new record added")
+                print(new_record)
                 return f"OFFER {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
             
     elif request == "REQUEST":
@@ -151,50 +154,16 @@ def dhcp_operation(parsed_message):
         mac = parsed_message[1]  # Extract the MAC address from the request
         ip = parsed_message[2]  # Extract the requested IP from the request
         timestamp = parsed_message[3]  # Extract the timestamp from the request
-        if mac in records:
+
+        if mac in records and records[mac]['IPAddress'] == ip:
             # If the client exists and the IP matches, update the timestamp and renew the lease
-            current_time = datetime.now()
-            message_time_with_space = records[mac]['Timestamp'][:10] + ' ' + records[mac]['Timestamp'][10:]
-            record_time = datetime.fromisoformat(message_time_with_space)
-            records[mac]['Timestamp'] = record_time
-            records[mac]['Acked'] = True 
-            return f"OFFER {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
+            current_time = datetime.now().isoformat()
+            records[mac]['Timestamp'] = current_time  # Update timestamp to current time
+            return f"RENEWED {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
         else:
-            ip_used = check_ip(mac) # returns true if found, false if not
-            time_expired = check_time(mac) # returns index of expired time, -1 if none
-            if (ip_used == True) and (time_expired != -1): # ip found and something is expired
-                records.pop(mac) # removing old record
-                records[time_expired]['IPAddress'] = ip_addresses[time_expired]
-                current_time = datetime.now().isoformat()
-                timestamp = datetime.fromisoformat(current_time)
-                new_time = timestamp + timedelta(seconds=60)
-                # Format the timestamp without space between date and time
-                formatted_timestamp = new_time.strftime("%Y-%m-%d %H:%M:%S.%f")
-                new_record = {
-                    "RecordNumber": record_num + 1,
-                    "MACAddress": mac,
-                    "IPAddress": get_nextIP(),
-                    "Timestamp": formatted_timestamp,
-                    "Acked": False
-                }
-                records[mac] = new_record
-            elif (ip_used == True) and (time_expired == -1): # ip found but none are expired
-                return "DECLINE"
-            else: # store new record
-                current_time = datetime.now().isoformat()
-                timestamp = datetime.fromisoformat(current_time)
-                new_time = timestamp + timedelta(seconds=60)
-                # Format the timestamp without space between date and time
-                formatted_timestamp = new_time.strftime("%Y-%m-%d%H:%M:%S.%f")
-                new_record = {
-                    "RecordNumber": record_num + 1,
-                    "MACAddress": mac,
-                    "IPAddress": get_nextIP(),
-                    "Timestamp": formatted_timestamp,
-                    "Acked": False
-                }
-                records[mac] = new_record
-                return f"OFFER {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
+            return "DECLINE"  # Decline the renewal request if conditions are not met
+    else:
+       return f'INVALID REQUEST  {request}'  # Handle any unrecognized request type
 
 # Start a UDP server
 server = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)

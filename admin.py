@@ -17,11 +17,9 @@ admin.bind(("10.0.0.100", 9000))
 
 try:
     while True:
-        message, clientAddress = server.recvfrom(4096)
-        parsed_message = parse_message(message.decode()) # parsed message is a list
-        print("Server: Message received from server with request ") 
-        print(parsed_message[0])
-        admin.sendto(response.encode(), clientAddress)
+        message = "LIST"
+        admin.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
+        message, clientAddress = admin.recvfrom(4096)
 except OSError:
     pass
 except KeyboardInterrupt:

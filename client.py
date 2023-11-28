@@ -32,11 +32,11 @@ def check_MAC(message_mac):
         return False
 
 # checks whether the timestamp is not expired
-def check_timestamp(message_time):
+def check_timestamp(message_time): # message_time is a string
     current_time = datetime.now()
-    message_time_with_t = message_time[:10] + 'T' + message_time[10:]
-    record_time = datetime.fromisoformat(message_time_with_t)
-    if current_time < record_time:
+    time = datetime.fromisoformat(message_time)
+    print(time)
+    if time > current_time:
         return True
     else:
         return False
@@ -61,11 +61,15 @@ try:
         message, clientAddress = clientSocket.recvfrom(4096)
         parsed_message = parse_message(message.decode())
         print("Client: Message received from server with request ") 
-        print(parsed_message[0])
+        print(parsed_message)
 
         if parsed_message[0] == "OFFER":
-            if check_MAC(parsed_message[1]) and check_timestamp(parsed_message[3]): # mac from message matches client mac and time not expired
-                message = "REQUEST " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[3]
+            print("inside offer")
+            print(parsed_message[3]+parsed_message[4])
+            if check_MAC(parsed_message[1]) and check_timestamp(parsed_message[3]+" "+parsed_message[4]): # mac from message matches client mac and time not expired
+                message = "REQUEST " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[3] + parsed_message[4]
+                print("sending offer...")
+                print(message)
                 clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
             else:
                 print("Error: MAC address does not match or time is expired")
