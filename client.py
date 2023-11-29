@@ -50,13 +50,12 @@ def menu():
     choice = int(input())
     return choice
 
-
+# Sending DISCOVER 
+print("Client: Discovering...")    
+message = "DISCOVER " + MAC
+clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
 try:
     while True:
-        # Sending DISCOVER 
-        print("Client: Discovering...")    
-        message = "DISCOVER " + MAC
-        clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
         # LISTENING FOR RESPONSE
         message, clientAddress = clientSocket.recvfrom(4096)
         parsed_message = parse_message(message.decode())
@@ -82,6 +81,20 @@ try:
             else: # matches
                 print("Your IP address is: " + parsed_message[2] + " which will expire at " + parsed_message[3])
                 client_choice = menu()
+                if client_choice == 1: # release
+                        print("Client: Releasing IP address " + parsed_message[1])
+                        message = "RELEASE " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[3]
+                        clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
+                elif client_choice == 2: # renew
+                    print("Client: Renewing...")
+                    message = "RENEW " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[3]
+                    print(message)
+                    clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
+                else: # quit
+                    sys.exit()
+        else: # release goes here?
+            client_choice = menu()
+            while True:
                 if client_choice == 1: # release
                         print("Client: Releasing...")
                         message = "RELEASE " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[3]
