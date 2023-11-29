@@ -30,8 +30,10 @@ def parse_message(message):
     if (len(message_parts) == 4): # normal case
         # Dictionary and appending it to records
         # mac is the key value
+        global record_num
+        record_num += 1
         new_record = {
-            "RecordNumber": record_num + 1,
+            "RecordNumber": record_num,
             "MACAddress": message_parts[1],
             "IPAddress": message_parts[2],
             "Timestamp": message_parts[3],
@@ -55,8 +57,6 @@ def check_ip(mac):
             return True
     return False
 
-
-
 def check_time(mac):
     current_time = datetime.now() # date time object format date _ time
     # Loop through the records and check if each timestamp is less than the current time
@@ -67,18 +67,31 @@ def check_time(mac):
             return record
     return -1
 
-
 def get_nextIP():
     for ip in ip_addresses:
         if ip not in [record['IPAddress'] for record in records.values()]:
             return ip
+
+def get_non_expired_records():
+    current_time = datetime.now()
+
+    non_expired_records = {}
+    for mac, record in records.items():
+        timestamp = record.get('Timestamp')
+        if timestamp:
+            timestamp_datetime = datetime.fromisoformat(timestamp)
+            if current_time < timestamp_datetime:  # Check if the timestamp is not expired
+                non_expired_records[mac] = record
+
+    return non_expired_records
  
 # Calculate response based on message
 def dhcp_operation(parsed_message):
     global record_num
     request = parsed_message[0]
     if request == "LIST":
-        response_str = json.dumps(records, indent=2)  # Convert the dictionary to a JSON-formatted string
+        # get_non_expired_records()
+        response_str = json.dumps(get_non_expired_records(), indent=2)  # Convert the dictionary to a JSON-formatted string
         return response_str
     elif request == "DISCOVER":
         mac = parsed_message[1]  # Extract the MAC address from the request
@@ -150,15 +163,16 @@ def dhcp_operation(parsed_message):
                 return f"ACKNOWLEDGE {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
     elif request == "RELEASE":
         mac = parsed_message[1]  # Extract the MAC address from the request
+        print("mac is " + mac)
         if mac in records:
             current_time = datetime.now().isoformat()
             records[mac]['Timestamp'] = current_time # setting time to an expired time
             records[mac]['Acked'] = False 
             print("Server: IP address " + parsed_message[2] + " released.")
-            return "RELEASE"
+            return "RELEASED"
         else:
-            print("Server: Cannot release, not found")
-        return None
+            print("Server: Cannot Release.")
+            return "CANTRELEASE"
     elif request == "RENEW":
         mac = parsed_message[1]  # Extract the MAC address from the request
         ip = parsed_message[2]  # Extract the requested IP from the request
@@ -172,7 +186,7 @@ def dhcp_operation(parsed_message):
             records[mac]['Timestamp'] = new_time.isoformat()
             records[mac]['Acked'] = True 
             print("Client: Renewed and added 60 seconds...")
-            return f"RENEWED {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
+            return f"ACKNOWLEDGE {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
         else: # not in records
             ip_used = check_ip(parsed_message[1]) # returns true if found, false if not
             time_expired = check_time(parsed_message[1]) # returns index of expired time, -1 if none
@@ -184,7 +198,7 @@ def dhcp_operation(parsed_message):
                 del records[mac]
                 current_time = datetime.now().isoformat()
                 timestamp = datetime.fromisoformat(current_time)
-                new_time = timestamp + ti
+                new_time = timestamp + timedelta(seconds=60) 
                 record_num += 1
                 new_record = {
                     "RecordNumber": record_num,
@@ -230,8 +244,9 @@ try:
         print("Server: Message received from client") 
         parsed_message = parse_message(message.decode()) # parsed message is a list
         response = dhcp_operation(parsed_message)
-        if(response == "RELEASE"):
-            pass
+        if(response == "RELEASED"):
+            offer_message = "SUCCESS"
+            server.sendto(offer_message.encode(), clientAddress)
         else:
             server.sendto(response.encode(), clientAddress)
 except OSError:

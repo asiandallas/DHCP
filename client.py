@@ -50,14 +50,28 @@ def menu():
     choice = int(input())
     return choice
 
+def release(m):
+    print("Client: Releasing IP address " + m[2])
+    message = "RELEASE " + m[1] + " " + m[2] + " " + parsed_message[3]
+    clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
+
+def renew(m):
+    print("Client: Renewing...")
+    message = "RENEW " + m[1] + " " + m[2] + " " + m[3]
+    print(message)
+    clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
+
 # Sending DISCOVER 
 print("Client: Discovering...")    
 message = "DISCOVER " + MAC
 clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
+original_parsed_message = None  # Store the original parsed_message
 try:
     while True:
         # LISTENING FOR RESPONSE
         message, clientAddress = clientSocket.recvfrom(4096)
+        if message.decode() == "SUCCESS":
+            original_parsed_message = parsed_message.copy()
         parsed_message = parse_message(message.decode())
         print("Client: Message received from server") 
 
@@ -82,33 +96,30 @@ try:
                 print("Your IP address is: " + parsed_message[2] + " which will expire at " + parsed_message[3])
                 client_choice = menu()
                 if client_choice == 1: # release
-                        print("Client: Releasing IP address " + parsed_message[1])
-                        message = "RELEASE " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[3]
-                        clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
+                    release(parsed_message)
                 elif client_choice == 2: # renew
-                    print("Client: Renewing...")
-                    message = "RENEW " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[3]
-                    print(message)
-                    clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
+                    renew(parsed_message)
                 else: # quit
                     sys.exit()
-        else: # release goes here?
+        elif parsed_message[0] == "SUCCESS":
+            break
+
+    while True:
             client_choice = menu()
-            while True:
-                if client_choice == 1: # release
-                        print("Client: Releasing...")
-                        message = "RELEASE " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[3]
-                        clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
-                elif client_choice == 2: # renew
-                    print("Client: Renewing...")
-                    message = "RENEW " + parsed_message[1] + " " + parsed_message[2] + " " + parsed_message[3]
-                    print(message)
-                    clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
-                else: # quit
-                    sys.exit()
+            if client_choice == 1: # release
+                if parsed_message[0] == "SUCCESS":
+                    print("IP address has been released already.")
+                    pass
+                else:
+                    release(parsed_message)
+            elif client_choice == 2: # renew
+                renew(original_parsed_message)
+            else: # quit
+                sys.exit()  
+
 except OSError:
     sys.exit()
 except KeyboardInterrupt:
     sys.exit()
 
-server.close()                
+clientSocket.close()                
