@@ -155,6 +155,7 @@ def dhcp_operation(parsed_message):
             records[mac]['Timestamp'] = current_time # setting time to an expired time
             records[mac]['Acked'] = False 
             print("Server: IP address " + parsed_message[2] + " released.")
+            return "RELEASE"
         else:
             print("Server: Cannot release, not found")
         return None
@@ -229,7 +230,10 @@ try:
         print("Server: Message received from client") 
         parsed_message = parse_message(message.decode()) # parsed message is a list
         response = dhcp_operation(parsed_message)
-        server.sendto(response.encode(), clientAddress)
+        if(response == "RELEASE"):
+            pass
+        else:
+            server.sendto(response.encode(), clientAddress)
 except OSError:
     pass
 except KeyboardInterrupt:
