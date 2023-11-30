@@ -169,6 +169,7 @@ def dhcp_operation(parsed_message):
             records[mac]['Timestamp'] = current_time # setting time to an expired time
             records[mac]['Acked'] = False 
             print("Server: IP address " + parsed_message[2] + " released.")
+            del records[mac]
             return "RELEASED"
         else:
             print("Server: Cannot Release.")
@@ -179,6 +180,7 @@ def dhcp_operation(parsed_message):
         timestamp = parsed_message[3]  # Extract the timestamp from the request
 
         if mac in records:
+            print("inside if statement in renew")
             # If the client exists and the IP matches, update the timestamp and renew the lease
             current_time = datetime.now().isoformat()
             timestamp = datetime.fromisoformat(current_time)
@@ -188,6 +190,7 @@ def dhcp_operation(parsed_message):
             print("Client: Renewed and added 60 seconds...")
             return f"ACKNOWLEDGE {records[mac]['MACAddress']} {records[mac]['IPAddress']} {records[mac]['Timestamp']}"
         else: # not in records
+            print("inside else statement in renew")
             ip_used = check_ip(parsed_message[1]) # returns true if found, false if not
             time_expired = check_time(parsed_message[1]) # returns index of expired time, -1 if none
             if (ip_used == True) and (time_expired == -1): # ip found but none are expired

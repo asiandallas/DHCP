@@ -58,7 +58,6 @@ def release(m):
 def renew(m):
     print("Client: Renewing...")
     message = "RENEW " + m[1] + " " + m[2] + " " + m[3]
-    print(message)
     clientSocket.sendto(message.encode(), (SERVER_IP, SERVER_PORT))
 
 # Sending DISCOVER 
@@ -113,6 +112,7 @@ try:
                 else:
                     release(parsed_message)
             elif client_choice == 2: # renew
+                print("Your IP address is: " + original_parsed_message[2] + " which will expire at " + original_parsed_message[3])
                 renew(original_parsed_message)
             else: # quit
                 sys.exit()  
